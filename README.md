@@ -45,8 +45,10 @@ If `cam --list` reports something other than a working sensor (e.g. "No
 sensor found for /dev/media0"), and `dmesg` shows an IPU6-related driver
 for your camera (`intel_ipu6`, `intel_ipu6_isys`, `hi556` — check `dmesg
 | grep -i ipu6`), this project is likely relevant. If `cam --list`
-already shows your camera working, you probably only need
-[the colour calibration part](#colour-calibration-details).
+already shows your camera working but the colours look off, you
+probably only need [colour calibration](#colour-calibration-details) —
+that's Installation step 3 by itself, skip steps 1, 2, and 4 unless you
+also want the on-demand privacy pipeline.
 
 This targets the **Hi556** sensor specifically for the calibration step
 (sections below and `tools/`); the firmware and privacy-pipeline parts
@@ -68,6 +70,7 @@ stable/testing) may not have IPU6 SoftISP support yet.
 | `gstreamer1.0-libcamera`      | `libcamerasrc` GStreamer element            |
 | `gstreamer1.0-plugins-base`   | `videotestsrc` (placeholder pipeline)       |
 | `gstreamer1.0-plugins-good`   | `videocrop`, `v4l2sink`                     |
+| `gstreamer1.0-tools`          | `gst-launch-1.0`, used by the watcher script |
 | `v4l2loopback-dkms`           | Kernel module for the virtual camera device |
 | `v4l2loopback-utils`          | `v4l2loopback-ctl` and friends              |
 | `v4l-utils`                   | `v4l2-ctl`, `media-ctl` (debugging)         |
@@ -77,7 +80,8 @@ stable/testing) may not have IPU6 SoftISP support yet.
 ```bash
 sudo apt install libcamera0.7 libcamera-ipa libcamera-tools libcamera-v4l2 \
   gstreamer1.0-libcamera gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-  v4l2loopback-dkms v4l2loopback-utils v4l-utils p7zip-full python3-yaml
+  gstreamer1.0-tools v4l2loopback-dkms v4l2loopback-utils v4l-utils \
+  p7zip-full python3-yaml
 ```
 
 A kernel with working `intel_ipu6`, `intel_ipu6_isys`, `hi556`, and IVSC
@@ -98,7 +102,8 @@ for a while (this was developed on 7.0.13); no out-of-tree
    ```bash
    sudo cp etc-modprobe.d-v4l2loopback.conf /etc/modprobe.d/v4l2loopback.conf
    echo v4l2loopback | sudo tee /etc/modules-load.d/v4l2loopback.conf
-   sudo modprobe -r v4l2loopback && sudo modprobe v4l2loopback
+   sudo modprobe -r v4l2loopback  # ok if this errors — fine if the module wasn't loaded yet
+   sudo modprobe v4l2loopback
    ```
 
 3. **Install colour tuning.** Either the real factory calibration
@@ -106,7 +111,8 @@ for a while (this was developed on 7.0.13); no out-of-tree
    for how to obtain it) or the hand-estimated fallback:
 
    ```bash
-   # Real calibration, once you have hi556.yaml (see below):
+   # Real calibration, once you have hi556.yaml (see "Colour calibration
+   # details" above for how to generate it):
    sudo cp hi556.yaml /usr/share/libcamera/ipa/simple/hi556.yaml
    # ...or the fallback, no extra steps needed:
    sudo cp hi556.default.yaml /usr/share/libcamera/ipa/simple/hi556.yaml
@@ -225,7 +231,7 @@ actually using the camera — not run continuously in the background.
 ```
 
 A watcher script (`libcamera-loopback-watch.sh`, runs as a systemd user
-service) polls every 0.3s via `fuser`/`lsof` whether an *external*
+service) polls every 0.3s via `fuser` whether an *external*
 process (not its own producer) holds `/dev/video42` open, and switches
 between the placeholder and the real camera feed accordingly (with a
 ~3s grace period to avoid flapping on short gaps).
@@ -272,7 +278,11 @@ themselves:
    this is "Intel 2D Imaging/MCU/Visual Sensing Controller Driver for
    Camera", from the official support site for your exact model
    (support site → drivers & downloads → enter service tag).
-2. Run the extraction script:
+2. Run the extraction script (Dell-specific as written — it expects a
+   Dell DUP installer; on Lenovo/other vendors you'll need to unpack
+   the driver package yourself, e.g. with `7z x` or `innoextract`, and
+   run `tools/parse_aiqb.py` directly against the resulting
+   `HI556_*.aiqb` file):
 
    ```bash
    ./tools/extract_calibration.sh /path/to/Intel-2D-Imaging-..._WIN64_....EXE
@@ -313,7 +323,7 @@ video calls, inaccurate for saturated colours.
 - `videocrop` values in `libcamera-loopback-watch.sh`
   (256/256/160/160, assuming a 1280×720 delivery size) are hardcoded to
   a moderate zoom level (~20% tighter framing); adjust if needed
-- Trigger detection is based on `fuser`/`lsof` polling (no native
+- Trigger detection is based on `fuser` polling (no native
   v4l2loopback open event); apps that open the device for only
   milliseconds (e.g. `ffmpeg -frames:v 1`) can be missed by the
   watcher. Real video-call apps with preview/retry behaviour (Webex

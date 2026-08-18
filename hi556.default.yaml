@@ -4,7 +4,8 @@
 # approximation (usable for video calls) but not accurate, especially for
 # saturated colours. For proper calibration, run
 # tools/extract_calibration.sh against your own Dell camera driver
-# download to generate hi556.yaml (see README.md, section 6).
+# download to generate hi556.yaml (see README.md, "Colour calibration
+# details").
 %YAML 1.1
 ---
 version: 1
