@@ -134,11 +134,16 @@ pipeline handler + SoftISP** — works natively with Hi556, no proprietary
 blobs needed.
 
 ```
-sudo apt install --only-upgrade libcamera0.7 libcamera-ipa libcamera-tools \
-  libcamera-v4l2 gstreamer1.0-libcamera libspa-0.2-libcamera
+sudo apt install libcamera0.7 libcamera-ipa libcamera-tools libcamera-v4l2 \
+  gstreamer1.0-libcamera libspa-0.2-libcamera
 ```
 
-After the BIOS fix (section 3), the regular Debian package already
+(If these packages are already installed at an older version, e.g. from
+`stable`/`testing`, use `apt install --only-upgrade` instead, or point
+apt at `unstable` — see the [Requirements](#requirements) section for
+the exact versions confirmed to work.)
+
+After the BIOS fix (section 3), a sufficiently recent libcamera already
 detects the camera correctly (`cam --list` shows `hi556`) — no custom
 libcamera build needed.
 
