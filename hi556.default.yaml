@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: CC0-1.0
+# Fallback tuning for the Hi556 sensor — hand-estimated from a few photo
+# comparisons, NOT the real factory calibration. Colours are a reasonable
+# approximation (usable for video calls) but not accurate, especially for
+# saturated colours. For proper calibration, run
+# tools/extract_calibration.sh against your own Dell camera driver
+# download to generate hi556.yaml (see README.md, section 6).
+%YAML 1.1
+---
+version: 1
+algorithms:
+  - BlackLevel:
+  - Awb:
+  - Ccm:
+      ccms:
+        - ct: 4000
+          ccm: [ 1.3,   -0.3,   -0.1,
+                -0.08,   0.75,  -0.05,
+                -0.05,  -0.3,    1.05]
+        - ct: 10000
+          ccm: [ 1.3,   -0.3,   -0.1,
+                -0.08,   0.75,  -0.05,
+                -0.05,  -0.3,    1.05]
+  - Adjust:
+  - Agc:
+...
