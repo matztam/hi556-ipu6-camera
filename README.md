@@ -1,11 +1,17 @@
 # Hi556 / Intel IPU6 Camera on Linux (Dell Latitude 7440)
 
-Documentation of how the built-in camera on this laptop (Dell Latitude 7440,
-Raptor Lake-P, Intel IPU6 image processor, Hi556 sensor) was brought up on
-Debian Linux — including the firmware fix, an on-demand privacy pipeline,
-and colour calibration extracted from the Windows driver.
+Documentation of how the built-in camera on a Dell Latitude 7440
+(Raptor Lake-P, Intel IPU6 image processor, Hi556 sensor) was brought up
+on Debian Linux — including the firmware fix, an on-demand privacy
+pipeline, and colour calibration extracted from the Windows driver.
 
-System: Debian GNU/Linux sid/trixie, kernel 7.0.13+deb14-amd64.
+Should generalize to other Raptor Lake-P/Alder Lake laptops with an IPU6 +
+Hi556 combo (several other Dell and Lenovo models share this hardware),
+though the exact IVSC failure signature and BIOS fix in sections 2–3 were
+diagnosed specifically on a Latitude 7440.
+
+Developed and tested on: Debian GNU/Linux sid/trixie,
+kernel 7.0.13+deb14-amd64.
 
 ## Contents
 
@@ -22,29 +28,29 @@ System: Debian GNU/Linux sid/trixie, kernel 7.0.13+deb14-amd64.
 
 ## Requirements
 
-Package versions actually used and verified on this system (Debian
-sid/trixie). Older versions may or may not work — in particular,
 `libcamera` needs a version recent enough to include SoftISP support for
-IPU6 sensors (available since roughly 0.3.x; 0.7.x is what's confirmed
-here).
+IPU6 sensors — this was developed against `libcamera0.7`/`libcamera-ipa`
+0.7.2 from Debian unstable; older packaged versions (e.g. from
+stable/testing) may not have IPU6 SoftISP support yet. If `cam --list`
+still doesn't detect the sensor after section 3's BIOS fix, try upgrading
+libcamera from unstable first before looking further.
 
-| Package                      | Minimum version tested | Purpose                                    |
-|-------------------------------|------------------------|---------------------------------------------|
-| `libcamera0.7`                | 0.7.2-1                | Core libcamera library                      |
-| `libcamera-ipa`                | 0.7.2-1                | Simple pipeline handler + SoftISP           |
-| `libcamera-tools`              | 0.7.2-1                | `cam` CLI, useful for testing               |
-| `libcamera-v4l2`               | 0.7.2-1                | V4L2 compatibility layer                    |
-| `gstreamer1.0-libcamera`       | 0.7.2-1                | `libcamerasrc` GStreamer element            |
-| `gstreamer1.0-plugins-base`    | 1.28.6-2                | `videotestsrc` (placeholder pipeline)       |
-| `gstreamer1.0-plugins-good`    | 1.28.4-1                | `videocrop`, `v4l2sink`                     |
-| `v4l2loopback-dkms`            | 0.15.4-1                | Kernel module for the virtual camera device |
-| `v4l2loopback-utils`           | 0.15.4-1                | `v4l2loopback-ctl` and friends              |
-| `v4l-utils`                    | 1.32.0-5                | `v4l2-ctl`, `media-ctl` (debugging)         |
-| `p7zip-full`                   | 16.02+transitional.1    | Unpacking the Dell driver installer         |
-| `python3-yaml`                 | 6.0.3-1                 | Used by `tools/parse_aiqb.py`               |
-| `fwupd`                        | any recent              | BIOS update via `fwupdmgr` (section 3)      |
+| Package                     | Purpose                                    |
+|------------------------------|---------------------------------------------|
+| `libcamera0.7`               | Core libcamera library                      |
+| `libcamera-ipa`               | Simple pipeline handler + SoftISP           |
+| `libcamera-tools`             | `cam` CLI, useful for testing               |
+| `libcamera-v4l2`              | V4L2 compatibility layer                    |
+| `gstreamer1.0-libcamera`      | `libcamerasrc` GStreamer element            |
+| `gstreamer1.0-plugins-base`   | `videotestsrc` (placeholder pipeline)       |
+| `gstreamer1.0-plugins-good`   | `videocrop`, `v4l2sink`                     |
+| `v4l2loopback-dkms`           | Kernel module for the virtual camera device |
+| `v4l2loopback-utils`          | `v4l2loopback-ctl` and friends              |
+| `v4l-utils`                   | `v4l2-ctl`, `media-ctl` (debugging)         |
+| `p7zip-full`                  | Unpacking the Dell driver installer         |
+| `python3-yaml`                | Used by `tools/parse_aiqb.py`               |
 
-Install everything except `fwupd` (usually already present) in one go:
+Install everything in one go:
 
 ```bash
 sudo apt install libcamera0.7 libcamera-ipa libcamera-tools libcamera-v4l2 \
@@ -53,9 +59,9 @@ sudo apt install libcamera0.7 libcamera-ipa libcamera-tools libcamera-v4l2 \
 ```
 
 A kernel with working `intel_ipu6`, `intel_ipu6_isys`, `hi556`, and IVSC
-(`mei_vsc`, `ivsc_csi`) drivers is required — these are mainline as of a
-reasonably recent kernel (verified here on 7.0.13); no out-of-tree
-`ipu6-drivers` module is needed.
+(`mei_vsc`, `ivsc_csi`) drivers is required — these have been mainline for
+a while (this was developed on 7.0.13); no out-of-tree `ipu6-drivers`
+module is needed.
 
 ---
 
@@ -98,8 +104,10 @@ identical bugs: RH Bugzilla #2316918, #2324683, GitHub
 
 ## 3. Fix: Dell BIOS update
 
-The BIOS was 10 versions out of date (1.16.0 instead of 1.32.0, May 2026).
-After a full BIOS update via `fwupdmgr`:
+In this case, the BIOS was several versions out of date. After a full
+BIOS update to the latest available version — via `fwupd`/`fwupdmgr`
+(usually preinstalled on modern distros; Dell also publishes BIOS updates
+as a bootable image if `fwupd` doesn't support your model):
 
 ```
 sudo fwupdmgr refresh --force
@@ -116,13 +124,15 @@ intel-ipu6 0000:00:05.0: Found supported sensor INT3537:00
 intel-ipu6 0000:00:05.0: Connected 1 cameras
 ```
 
-**If the BIOS update doesn't help**, research suggested these next steps:
+**If a BIOS update doesn't help**, other things worth trying based on the
+related upstream bug reports linked above:
 a full cold boot (not a warm reboot/suspend — pull the power, wait 30s), or
 reloading the driver modules in order
 (`mei_vsc_hw` → `mei_vsc` → `intel_ipu6` → `intel_ipu6_isys` → `ivsc_csi`).
 
-**Not useful** per research: Secure Boot, TPM/PTT settings, alternative
-firmware blob sources — no documented connection to this failure mode.
+**Unlikely to help**, per the same bug reports: Secure Boot, TPM/PTT
+settings, alternative firmware blob sources — no documented connection to
+this failure mode.
 
 ## 4. Software stack: libcamera SoftISP instead of Intel HAL
 
@@ -133,15 +143,10 @@ pitfalls. Instead: Debian's regular `libcamera` package
 pipeline handler + SoftISP** — works natively with Hi556, no proprietary
 blobs needed.
 
-```
-sudo apt install libcamera0.7 libcamera-ipa libcamera-tools libcamera-v4l2 \
-  gstreamer1.0-libcamera libspa-0.2-libcamera
-```
-
-(If these packages are already installed at an older version, e.g. from
-`stable`/`testing`, use `apt install --only-upgrade` instead, or point
-apt at `unstable` — see the [Requirements](#requirements) section for
-the exact versions confirmed to work.)
+See [Requirements](#requirements) above for the package list and install
+command. If these packages are already installed at an older version,
+e.g. from `stable`/`testing`, use `apt install --only-upgrade` instead, or
+point apt at `unstable`.
 
 After the BIOS fix (section 3), a sufficiently recent libcamera already
 detects the camera correctly (`cam --list` shows `hi556`) — no custom
@@ -269,8 +274,9 @@ sudo cp hi556.default.yaml /usr/share/libcamera/ipa/simple/hi556.yaml
 
 ## 7. Installation / reproduction
 
-On a freshly set-up system on this laptop (or an identical Dell
-Latitude 7440):
+On a freshly set-up Dell Latitude 7440 (or a similar Raptor Lake-P/IPU6/
+Hi556 laptop — adjust device paths and check `dmesg` output against
+section 2 if the exact symptoms differ):
 
 ```bash
 # 1. Keep the BIOS current (section 3)
