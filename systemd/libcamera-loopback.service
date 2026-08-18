@@ -1,0 +1,12 @@
+[Unit]
+Description=Watch /dev/video42 and feed the hi556 camera into it only while in use
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/libcamera-loopback-watch.sh
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
