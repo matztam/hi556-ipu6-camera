@@ -9,6 +9,7 @@ System: Debian GNU/Linux sid/trixie, kernel 7.0.13+deb14-amd64.
 
 ## Contents
 
+- [Requirements](#requirements)
 - [1. Initial problem](#1-initial-problem)
 - [2. Root cause: IPU6 firmware authentication failure](#2-root-cause-ipu6-firmware-authentication-failure)
 - [3. Fix: Dell BIOS update](#3-fix-dell-bios-update)
@@ -18,6 +19,43 @@ System: Debian GNU/Linux sid/trixie, kernel 7.0.13+deb14-amd64.
 - [7. Installation / reproduction](#7-installation--reproduction)
 - [8. Known limitations](#8-known-limitations)
 - [9. Useful debug commands](#9-useful-debug-commands)
+
+## Requirements
+
+Package versions actually used and verified on this system (Debian
+sid/trixie). Older versions may or may not work — in particular,
+`libcamera` needs a version recent enough to include SoftISP support for
+IPU6 sensors (available since roughly 0.3.x; 0.7.x is what's confirmed
+here).
+
+| Package                      | Minimum version tested | Purpose                                    |
+|-------------------------------|------------------------|---------------------------------------------|
+| `libcamera0.7`                | 0.7.2-1                | Core libcamera library                      |
+| `libcamera-ipa`                | 0.7.2-1                | Simple pipeline handler + SoftISP           |
+| `libcamera-tools`              | 0.7.2-1                | `cam` CLI, useful for testing               |
+| `libcamera-v4l2`               | 0.7.2-1                | V4L2 compatibility layer                    |
+| `gstreamer1.0-libcamera`       | 0.7.2-1                | `libcamerasrc` GStreamer element            |
+| `gstreamer1.0-plugins-base`    | 1.28.6-2                | `videotestsrc` (placeholder pipeline)       |
+| `gstreamer1.0-plugins-good`    | 1.28.4-1                | `videocrop`, `v4l2sink`                     |
+| `v4l2loopback-dkms`            | 0.15.4-1                | Kernel module for the virtual camera device |
+| `v4l2loopback-utils`           | 0.15.4-1                | `v4l2loopback-ctl` and friends              |
+| `v4l-utils`                    | 1.32.0-5                | `v4l2-ctl`, `media-ctl` (debugging)         |
+| `p7zip-full`                   | 16.02+transitional.1    | Unpacking the Dell driver installer         |
+| `python3-yaml`                 | 6.0.3-1                 | Used by `tools/parse_aiqb.py`               |
+| `fwupd`                        | any recent              | BIOS update via `fwupdmgr` (section 3)      |
+
+Install everything except `fwupd` (usually already present) in one go:
+
+```bash
+sudo apt install libcamera0.7 libcamera-ipa libcamera-tools libcamera-v4l2 \
+  gstreamer1.0-libcamera gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+  v4l2loopback-dkms v4l2loopback-utils v4l-utils p7zip-full python3-yaml
+```
+
+A kernel with working `intel_ipu6`, `intel_ipu6_isys`, `hi556`, and IVSC
+(`mei_vsc`, `ivsc_csi`) drivers is required — these are mainline as of a
+reasonably recent kernel (verified here on 7.0.13); no out-of-tree
+`ipu6-drivers` module is needed.
 
 ---
 
@@ -233,9 +271,10 @@ Latitude 7440):
 # 1. Keep the BIOS current (section 3)
 sudo fwupdmgr refresh --force && sudo fwupdmgr update
 
-# 2. Keep libcamera current
-sudo apt install --only-upgrade libcamera0.7 libcamera-ipa libcamera-tools \
-  libcamera-v4l2 gstreamer1.0-libcamera libspa-0.2-libcamera
+# 2. Install/update required packages (see Requirements above)
+sudo apt install libcamera0.7 libcamera-ipa libcamera-tools libcamera-v4l2 \
+  gstreamer1.0-libcamera gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+  v4l2loopback-dkms v4l2loopback-utils v4l-utils p7zip-full python3-yaml
 
 # 3. Configure v4l2loopback
 sudo cp etc-modprobe.d-v4l2loopback.conf /etc/modprobe.d/v4l2loopback.conf
